@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Meet Toys</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+            font-size: 16px; /* Increased font size */
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-wrap: wrap; /* Updated for two columns layout */
+            justify-content: space-between;
+        }
+        #logo {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px; /* Added space below the title */
+        }
+        .option {
+            flex-basis: 45%; /* Adjusted for two columns */
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 24px;
+            margin-right: 10px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #007BFF;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #007BFF;
+        }
+        input:checked + .slider:before {
+            transform: translateX(16px);
+        }
+        .slider.round {
+            border-radius: 24px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center; /* Centraliza o botão horizontalmente */
+            width: 100%; /* Ocupa a largura total do container */
+        }
+        button#save {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button#save:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    
+    <div id="logo"><img src="logo.svg"  alt="Logo" width="50%"></div>
+
+    <div class="option">
+        <label class="switch">
+            <input type="checkbox" id="enterAutomatically">
+            <span class="slider round"></span>
+        </label>
+        Automatically join the meeting
+    </div>
+    <div class="option">
+        <label class="switch">
+            <input type="checkbox" id="soundButtons">
+            <span class="slider round"></span>
+        </label>
+        Play sound when clicking buttons
+    </div>
+    <div class="option">
+        <label class="switch">
+            <input type="checkbox" id="mic">
+            <span class="slider round"></span>
+        </label>
+        Disable microphone at startup
+    </div>
+    <div class="option">
+        <label class="switch">
+            <input type="checkbox" id="cam">
+            <span class="slider round"></span>
+        </label>
+        Disable camera at startup
+    </div>
+</div>
+<div class="button-container">
+    <button id="save">Save Settings</button>
+</div>
+<script src="options.js"></script>
+</body>
+</html>
