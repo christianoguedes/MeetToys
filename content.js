@@ -1,6 +1,11 @@
 const eventListeners = [];
 const mic_on_sound = new Audio(chrome.runtime.getURL('sounds/mic_on.mp3'));
 const mic_off_sound = new Audio(chrome.runtime.getURL('sounds/mic_off.mp3'));
+const cam_on_sound = new Audio(chrome.runtime.getURL('sounds/cam_on.mp3'));
+const cam_off_sound = new Audio(chrome.runtime.getURL('sounds/cam_off.mp3'));
+const call_end_sound = new Audio(chrome.runtime.getURL('sounds/call_end.mp3'));
+let lastMessageElement = null;
+let participants = [];
 
 function addEventListenerWithTracking(target, eventType, handler) {
     target.addEventListener(eventType, handler);
@@ -22,10 +27,9 @@ function updateIcon(icon) {
 }
 
 function toogleMic(tabId) {
-    // console.log("toogle tabId" + tabId + " isOnMeet()" + isOnMeet()) ;
+    console.log("toogle tabId" + tabId + " isOnMeet()" + isOnMeet() + " isMicOn()" + isMicOn());
     if (isOnMeet()) {
         micButton().click();
-        updateIcon(!isMicOn());
     }
 }
 
@@ -46,7 +50,19 @@ function isOnMeet() {
 }
 
 function isMicOn() {
-    return micButton().getAttribute('data-is-muted') == "false"
+    return micButton().getAttribute('data-is-muted') == "false";
+}
+
+function isCamOn() {
+    return camButton().getAttribute('data-is-muted') == "false";
+}
+
+function peopleList() {
+    return document.querySelectorAll('div[role="list"]');
+}
+
+function peopleButton() {
+    return Array.from(document.querySelectorAll('i.google-symbols')).find(e => e.textContent.trim() === 'people');
 }
 
 function endButton() {
@@ -59,16 +75,28 @@ function endButton() {
     return null;
 }
 
-function sendIconMessage(negative = false, endCall = false) {
-    let isOn = negative ? !isMicOn() : isMicOn();
-    isOn = endCall ? null : isOn;
+function sendIconMessage(endCall = false) {
+    isOn = endCall ? null : isMicOn();
     updateIcon(isOn);
 }
 
 function playMicSound() {
-    console.log("play_sound");
-    let sound = !isMicOn() ? mic_on_sound : mic_off_sound
+    console.log("play_mic_sound");
+    let sound = isMicOn() ? mic_on_sound : mic_off_sound
     sound.play();
+}
+
+
+
+function playCamSound() {
+    console.log("playcam_sound: isCamOn()" + isCamOn());
+    let sound = isCamOn() ? cam_on_sound : cam_off_sound
+    sound.play();
+}
+
+function playEndCallSound() {
+    console.log("play_end_call_sound");
+    call_end_sound.play();
 }
 
 function audioButtonsOnRoom() {
@@ -91,13 +119,15 @@ function enterButtonCallOnRoom() {
     return document.querySelectorAll('button[data-promo-anchor-id] span')[0];
 }
 
-function waitElement(selector, callback, keepObserving = false) {
-    function existsAndIsVisible(selector, callback) {
+function waitElement(selector, callback, keepObserving = false, checkVisibility = true) {
+    let observer;
+
+    function exists(selector, callback) {
         const element = document.querySelector(selector);
-        if (element && isVisible(element)) {
+        if (element && (!checkVisibility || isVisible(element))) {
             callback(element);
-            if (!keepObserving) {
-                obs.disconnect();
+            if (!keepObserving && observer) {
+                observer.disconnect();
             }
         }
     }
@@ -106,10 +136,10 @@ function waitElement(selector, callback, keepObserving = false) {
         return element.offsetParent !== null && window.getComputedStyle(element).visibility !== 'hidden' && window.getComputedStyle(element).opacity !== '0';
     }
 
-    existsAndIsVisible(selector, callback);
+    exists(selector, callback);
 
-    const observer = new MutationObserver((mutations, obs) => {
-        existsAndIsVisible(selector, elemento => {
+    observer = new MutationObserver((mutations, obs) => {
+        exists(selector, elemento => {
             callback(elemento);
         });
     });
@@ -120,20 +150,19 @@ function waitElement(selector, callback, keepObserving = false) {
         attributes: true,
         attributeFilter: ['style', 'class']
     });
-
 }
 
 
 async function main() {
     removeAllEventListeners();
 
-    waitElement('div[data-is-muted][role="button"]', async function() {
+    waitElement('div[data-is-muted][role="button"]', async function () {
         let options = await getOptions();
         console.log("options: " + JSON.stringify(options));
-        if (options === undefined) { 
-            options = {"soundButtons": true, "disableMic": true, "disableCam": true, "enterAutomatically": false };
+        if (options === undefined) {
+            options = { "soundButtons": true, "disableMic": true, "disableCam": true, "enterAutomatically": false };
         }
-        
+
 
         console.log("isOnRoom");
         updateIcon(null);
@@ -142,30 +171,92 @@ async function main() {
         }
         if (options.disableMic) {
             micButtonOnRoom().click();
-        }        
+        }
         if (options.enterAutomatically) {
-            waitElement('button[data-promo-anchor-id] span',function() {
-                console.log("achou");
+            waitElement('button[data-promo-anchor-id] span', function () {
                 enterButtonCallOnRoom().click();
             });
         }
     });
-    waitElement('button[data-is-muted]', function() {
+    waitElement('button[data-is-muted]', function () {
         console.log("isOnMeet");
         updateIcon(isMicOn());
         addEventListenerWithTracking(micButton(), 'click', async function (event) {
             const options = await getOptions();
-            
-            sendIconMessage(true);
+
+            sendIconMessage();
             if (options.soundButtons) {
                 playMicSound();
             }
         });
 
         addEventListenerWithTracking(endButton(), 'click', async function (event) {
-            sendIconMessage(false, true);
+            sendIconMessage(endCall = true);
+            const options = await getOptions();
+            if (options.soundButtons) {
+                playEndCallSound();
+            }
         });
+
+        addEventListenerWithTracking(camButton(), 'click', async function (event) {
+            const options = await getOptions();
+            if (options.soundButtons) {
+                playCamSound();
+            }
+        });
+
+        waitElement('div[data-is-tv]', function () {
+            let search = document.querySelectorAll('div[data-is-tv]')
+            let message = search[search.length -1];
+            if (message === lastMessageElement) {
+                return;
+            }
+            call_end_sound.play();
+
+            let userName = findParentWithAttribute(message.parentElement, 'jsaction').children[0].children[0].textContent;
+            console.log("userName=" + userName + " text=" + message.textContent);
+
+            chrome.runtime.sendMessage({
+                action: "chatMessage",
+                title: userName,
+                message: message.textContent
+            });
+            lastMessageElement = message;
+        }, keepObserving=true, checkVisibility=false);
+
+        function checkPeopleLists() {
+            if (peopleList().length > 0) {
+                let new_participants = []
+                let participants_html = peopleList()[0];
+                for (let p of participants_html.children) {
+                    let img = p.querySelector('img').attributes['src'].value;
+                    let participant_name = p.querySelector('span').innerText;
+                    new_participants.push({"name": participant_name, "img": img});
+                }
+                new_participants.sort((a, b) => a.name.localeCompare(b.name));
+                if (JSON.stringify(new_participants) !== JSON.stringify(participants)) {
+                    participants = new_participants;
+                    console.log( "new_participants=" + JSON.stringify(new_participants));
+                    console.log( "participants=" + JSON.stringify(participants));
+                }
+            } else {
+                waitElement('i.google-symbols', function () {
+                    peopleButton().click();
+                    peopleButton().click();
+                });
+            }
+        }
+          
+        const observer = new MutationObserver((mutationsList, observer) => {
+        for (const mutation of mutationsList) {
+            if (mutation.type === 'childList' || mutation.type === 'subtree') {
+                checkPeopleLists();
+            }
+        }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
     });
+
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -188,11 +279,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             endButton().click();
         }
     }
+    if (message.action === 'toogle_cam_key') {
+        if (isOnMeet()) {
+            camButton().click();
+        }
+    }
 });
 
 function getOptions() {
     return new Promise((resolve, reject) => {
-        chrome.storage.sync.get('options', function(data) {
+        chrome.storage.sync.get('options', function (data) {
             if (chrome.runtime.lastError) {
                 reject(new Error(chrome.runtime.lastError));
             } else {
@@ -202,8 +298,27 @@ function getOptions() {
     });
 }
 
+function findParentWithAttribute(element, attribute) {
+    while (element && element !== document) {
+        if (element.hasAttribute(attribute)) {
+            return element;
+        }
+        element = element.parentElement;
+    }
+    return null;
+}
+
 main();
 
 
+// participants_html = document.querySelectorAll('div[role="list"]')[0]
+// participants = []
+// for (let p of participants_html.children) {
+//     let img = p.querySelector('img').attributes['src'].value;
+//     let participant_name = p.querySelector('span').innerText;
+//     participants.push({"name": participant_name, "img": img});
+// }
+// participants.sort((a, b) => a.name.localeCompare(b.name));
 
 
+// Array.from(document.querySelectorAll('i.google-symbols')).find(e => e.textContent.trim() === 'people');

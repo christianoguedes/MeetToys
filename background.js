@@ -40,6 +40,15 @@ chrome.commands.onCommand.addListener((command) => {
             });
         });
     }
+    if (command === "toogle_cam_key") {
+        console.log("shortcut toogle_cam_key");
+        chrome.tabs.query({url: urlPattern}, (tabs) => {
+            tabs.forEach((tab) => {
+                console.log("sending: toogle_cam_key");
+                chrome.tabs.sendMessage(tab.id, { action: 'toogle_cam_key'});
+            });
+        });
+    }
 });
 
 chrome.action.onClicked.addListener((tab) => {
@@ -61,10 +70,47 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "updateIcon") {
-        console.log("aqui222");
         updateIcon(message.isOn);
     }
+
+    if (message.action === "chatMessage") {
+        let notificationOptions = {
+            type: 'basic',
+            iconUrl: 'images/logo.png',
+            title: message.title,
+            message: message.message,
+            priority: 2
+        };
+        createNotification(notificationOptions);
+    }
 });
+
+function createNotification(notificationOptions) {
+    isTabActiveAndFocused(function(isActiveAndFocused) {
+        if (!isActiveAndFocused) {
+            chrome.notifications.create(null, notificationOptions, function(notificationId) {
+                if (chrome.runtime.lastError) {
+                    console.error('Error sending notification:', chrome.runtime.lastError);
+                } else {
+                    console.log('Notification sent with ID:', notificationId);
+                }
+            });
+        } else {
+            console.log('Tab is active and focused, not sending notification.');
+        }
+    });
+}
+
+function isTabActiveAndFocused(callback) {
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (tabs.length > 0) {
+            var currentTab = tabs[0];
+            callback(currentTab.active);
+        } else {
+            callback(false);
+        }
+    });
+}
 
 function toogleMic(tabId) {
     console.log("sending: toogleMic");

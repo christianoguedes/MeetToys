@@ -3,7 +3,7 @@
     "name": "Meet Toys",
     "version": "0.0.1",
     "host_permissions": ["*://meet.google.com/*-*-*"],
-    "permissions": ["tabs", "storage"],
+    "permissions": ["tabs", "storage", "notifications"],
     "background": {
         "service_worker": "background.js"
     },
@@ -20,6 +20,7 @@
             "description": "Toggle microphone",
             "global": true
         },
+
         "active_mic_key": {
             "suggested_key": {
                 "default": "Ctrl+Shift+3",
@@ -38,6 +39,14 @@
         },
         "disconnect_key": {
             "description": "End meet",
+            "global": false
+        },
+        "toogle_cam_key": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+5",
+                "mac": "Alt+5"
+            },
+            "description": "Toggle cam",
             "global": true
         }
     },
@@ -50,7 +59,7 @@
     "web_accessible_resources": [
         {
           "matches": ["*://meet.google.com/*"],
-          "resources": ["sounds/mic_off.mp3", "sounds/mic_on.mp3"]
+          "resources": ["sounds/*.mp3"]
         }
     ],
     "action": {
