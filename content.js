@@ -65,6 +65,10 @@ function peopleButton() {
     return Array.from(document.querySelectorAll('i.google-symbols')).find(e => e.textContent.trim() === 'people');
 }
 
+function chatButton() {
+    return Array.from(document.querySelectorAll('i.google-symbols')).find(e => e.textContent.trim() === 'chat');
+}
+
 function endButton() {
     const buttons = document.querySelectorAll('button i');
     for (const icon of buttons) {
@@ -85,8 +89,6 @@ function playMicSound() {
     let sound = isMicOn() ? mic_on_sound : mic_off_sound
     sound.play();
 }
-
-
 
 function playCamSound() {
     console.log("playcam_sound: isCamOn()" + isCamOn());
@@ -117,6 +119,88 @@ function camButtonOnRoom() {
 
 function enterButtonCallOnRoom() {
     return document.querySelectorAll('button[data-promo-anchor-id] span')[0];
+}
+
+function checkPeopleLists() {
+    if (peopleList().length > 0) {
+        let new_participants = []
+        let participants_html = peopleList()[0];
+        for (let p of participants_html.children) {
+            let img = p.querySelector('img').attributes['src'].value;
+            let participant_name = p.querySelector('span').innerText;
+            new_participants.push({"name": participant_name, "picture": img});
+        }
+        new_participants.sort((a, b) => a.name.localeCompare(b.name));
+        if (JSON.stringify(new_participants) !== JSON.stringify(participants)) {
+            if (participants.length === 0) {
+                participants = new_participants;
+                updateParticipantsOnServer();
+            } 
+            participants = new_participants;
+            console.log("new participants in meet");
+        }
+    } else {
+        waitElement('i.google-symbols', function () {
+            peopleButton().click();
+            peopleButton().click();
+        });
+    }
+}
+
+function chatNotifications() {
+    let search = document.querySelectorAll('div[data-is-tv]')
+    let message = search[search.length -1];
+    if (message === lastMessageElement) {
+        return;
+    }
+    call_end_sound.play(); //TODO: new sound
+
+    let userName = findParentWithAttribute(message.parentElement, 'jsaction').children[0].children[0].textContent;
+    console.log("userName=" + userName + " text=" + message.textContent);
+
+    chrome.runtime.sendMessage({
+        action: "chatMessage",
+        title: userName,
+        message: message.textContent
+    });
+    lastMessageElement = message;
+}
+
+function updateParticipantsOnServer() {
+    if (participants.length === 0) {
+        return;
+    }
+    const options = {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(participants)
+    };
+    
+
+    fetch('http://localhost:8383/meet/' + getMeetId(), options)
+    .then(response => {
+        if (!response.ok) {
+            console.log("Error on send participants");
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+    });
+}
+
+function observerParticipants() {
+    const observer = new MutationObserver((mutationsList, observer) => {
+    for (const mutation of mutationsList) {
+        if (mutation.type === 'childList' || mutation.type === 'subtree') {
+            checkPeopleLists();
+        }
+    }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function getMeetId() {
+    return window.location.pathname.replace('/', '');
 }
 
 function waitElement(selector, callback, keepObserving = false, checkVisibility = true) {
@@ -206,55 +290,15 @@ async function main() {
         });
 
         waitElement('div[data-is-tv]', function () {
-            let search = document.querySelectorAll('div[data-is-tv]')
-            let message = search[search.length -1];
-            if (message === lastMessageElement) {
-                return;
-            }
-            call_end_sound.play();
-
-            let userName = findParentWithAttribute(message.parentElement, 'jsaction').children[0].children[0].textContent;
-            console.log("userName=" + userName + " text=" + message.textContent);
-
-            chrome.runtime.sendMessage({
-                action: "chatMessage",
-                title: userName,
-                message: message.textContent
-            });
-            lastMessageElement = message;
+            chatNotifications();
         }, keepObserving=true, checkVisibility=false);
-
-        function checkPeopleLists() {
-            if (peopleList().length > 0) {
-                let new_participants = []
-                let participants_html = peopleList()[0];
-                for (let p of participants_html.children) {
-                    let img = p.querySelector('img').attributes['src'].value;
-                    let participant_name = p.querySelector('span').innerText;
-                    new_participants.push({"name": participant_name, "img": img});
-                }
-                new_participants.sort((a, b) => a.name.localeCompare(b.name));
-                if (JSON.stringify(new_participants) !== JSON.stringify(participants)) {
-                    participants = new_participants;
-                    console.log( "new_participants=" + JSON.stringify(new_participants));
-                    console.log( "participants=" + JSON.stringify(participants));
-                }
-            } else {
-                waitElement('i.google-symbols', function () {
-                    peopleButton().click();
-                    peopleButton().click();
-                });
-            }
-        }
           
-        const observer = new MutationObserver((mutationsList, observer) => {
-        for (const mutation of mutationsList) {
-            if (mutation.type === 'childList' || mutation.type === 'subtree') {
-                checkPeopleLists();
-            }
-        }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+        observerParticipants();
+        chatButton().click();
+        chatButton().click();
+
+        setInterval(updateParticipantsOnServer, 5 * 60 * 1000);
+
     });
 
 }
